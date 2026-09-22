@@ -81,10 +81,8 @@ func (col *Nullable) ScanRow(dest any, row int) error {
 	return col.base.ScanRow(dest, row)
 }
 
-// scanNullInto writes a ClickHouse NULL into a scan destination: it resets the
-// double-pointer destinations produced for nullable columns to nil and, when dest
-// implements sql.Scanner, invokes Scan(nil). The reflection fallback also handles
-// pointer destinations for types that are not listed explicitly, such as decimal.Decimal.
+// scanNullInto clears pointer destinations for NULL and delegates to sql.Scanner.
+// Reflection covers pointer types not listed explicitly, such as **decimal.Decimal.
 func scanNullInto(dest any) error {
 	switch v := dest.(type) {
 	case **uint64:
@@ -102,6 +100,8 @@ func scanNullInto(dest any) error {
 	case **uint8:
 		*v = nil
 	case **int8:
+		*v = nil
+	case **int:
 		*v = nil
 	case **string:
 		*v = nil
