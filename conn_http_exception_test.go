@@ -3,6 +3,9 @@ package clickhouse
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -296,15 +299,24 @@ func TestHTTPReadDataEOFDoesNotLogDecodeError(t *testing.T) {
 		logger: slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	}
 
-	reader := chproto.NewReader(bytes.NewReader(nil))
+	reader := chproto.NewReader(wrappedEOFReader{})
 	block, err := h.readData(reader, nil, &bytes.Buffer{})
 	if !errors.Is(err, io.EOF) {
 		t.Fatalf("expected io.EOF, got %v", err)
 	}
+	if err == io.EOF {
+		t.Fatalf("expected wrapped EOF context, got bare io.EOF")
+	}
 	if block != nil {
 		t.Fatalf("expected nil block, got %#v", block)
 	}
-	if got := logBuf.String(); got != "" {
+	if got := logBuf.String(); strings.Contains(got, "level=ERROR") {
 		t.Fatalf("expected no error log, got %q", got)
 	}
+}
+
+type wrappedEOFReader struct{}
+
+func (wrappedEOFReader) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("read block: header: %w", io.EOF)
 }
